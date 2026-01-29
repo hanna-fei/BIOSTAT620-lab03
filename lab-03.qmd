@@ -1,6 +1,7 @@
 ---
 title: "lab-03"
 format: html
+embed-resources: true
 editor: visual
 ---
 
@@ -61,7 +62,7 @@ tail(met)
 met_temp <- met[order(met$temp), ]
 head(met_temp)
 ```
-The lowest temperature is located at Ellicott, CO. 
+The lowest temperature is located at Ellicott, CO. This is a little suspicious, since the average temperatures in July at this location are usually much higher.
 
 ### 6. Summary statistics
 ```{r}
@@ -77,6 +78,7 @@ Wind speed and day are also moderately correlated, with a correlation coefficien
 
 ### 7. Exploratory graphs
 ```{r}
+par(mfrow = c(2,2))
 hist(met$elev)
 hist(met$temp)
 hist(met$wind.sp)
@@ -104,3 +106,9 @@ The time series plot for temperature stays relatively within the same range, wit
 
 ### 8. Questions
 Why are there so many missing data for variables like temperature, elevation, and wind speed?
+
+Is there an association between temperature and wind speed?
+```{r}
+plot(elev$temp, elev$dew.point)
+```
+It seems that temperature and dew point at the highest elevation have a very strong positive linear relationship, which is to be expected.
