@@ -1,0 +1,252 @@
+---
+title: "Lab 9"
+author: "Hanna Fei"
+format: html
+editor: visual
+embed-resources: true
+toc: true
+---
+
+### Intro: Set up SQL Database
+
+```{r}
+library(RSQLite)
+library(DBI)
+
+# download data
+doctor <- read.csv("https://raw.githubusercontent.com/dmcable/BIOSTAT620W26/main/data/hospital/doctor.csv")
+visit <- read.csv("https://raw.githubusercontent.com/dmcable/BIOSTAT620W26/main/data/hospital/visit.csv")
+patient <- read.csv("https://raw.githubusercontent.com/dmcable/BIOSTAT620W26/main/data/hospital/patient.csv")
+payment <- read.csv("https://raw.githubusercontent.com/dmcable/BIOSTAT620W26/main/data/hospital/payment.csv")
+
+con <- dbConnect(SQLite(), ":memory:")
+dbWriteTable(con, "doctor", doctor)
+dbWriteTable(con, "patient", patient)
+dbWriteTable(con, "payment", payment)
+dbWriteTable(con, "visit", visit)
+dbListTables(con)
+```
+
+```{sql connection=con}
+PRAGMA table_info(doctor)
+```
+
+# **Exercise 1**
+
+Retrieve the doctor ID, first name and last name for all doctors using the `doctor` table. Sort by last name and then by first name (note that the code chunk below is set up to run SQL code rather than R code).
+
+```{sql, connection = con}
+SELECT doctor_id, first_name, last_name
+FROM doctor
+ORDER by last_name, first_name
+```
+
+# **Exercise 2**
+
+Retrieve the doctor ID, first name, and last name for doctors whose last name equals ‘WILLIAMS’ or ‘DAVIS’.
+
+```{sql connection=con}
+SELECT doctor_id, first_name, last_name
+FROM doctor
+WHERE last_name IN ('WILLIAMS', 'DAVIS')
+```
+
+# **Exercise 3**
+
+Write a query against the `visit` table that returns the IDs of the patients who visited a hospital starting on July 5, 2005 (use the visit_start_date column, and you can use the `date()` function to ignore the time component). Include a single row for each distinct patient ID.
+
+```{sql connection=con}
+SELECT DISTINCT patient_id
+FROM visit
+WHERE date(visit_start_date) = '2005-07-05'
+```
+
+# **Exercise 4**
+
+## **Exercise 4.1**
+
+Construct a query that retrieves all columns of rows from the `payment` table where the amount is either 199, 799, or 999.
+
+```{sql connection=con}
+PRAGMA table_info(payment)
+```
+
+```{sql connection=con}
+SELECT *
+FROM payment
+WHERE amount IN (199, 799, 999)
+```
+
+## **Exercise 4.2**
+
+Construct a query that retrieves all columns of rows from the `payment` table where the amount is greater then 500.
+
+```{sql connection=con}
+SELECT *
+FROM payment
+WHERE amount > 500
+```
+
+## **Exercise 4.3**
+
+Construct a query that retrieves all columns of rows from the `payment` table where the amount is greater then 500 and less then 800.
+
+```{sql connection=con}
+SELECT *
+FROM payment
+WHERE amount > 500 AND amount < 800
+```
+
+# **Exercise 5**
+
+Retrieve all the payment IDs and their amounts from the patients whose last name is ‘DAVIS’.
+
+```{sql connection=con}
+PRAGMA table_info(patient)
+```
+
+```{sql connection=con}
+PRAGMA table_info(payment)
+```
+
+```{sql connection=con}
+SELECT payment_id, amount
+FROM patient as a
+  INNER JOIN payment as b
+WHERE a.patient_id = b.patient_id
+AND last_name = 'DAVIS'
+```
+
+# **Exercise 6**
+
+## **Exercise 6.1**
+
+Use `COUNT(*)` to count the number of rows in `visit`.
+
+```{sql connection=con}
+SELECT
+  COUNT(*) AS count
+FROM visit
+```
+
+## **Exercise 6.2**
+
+Use `COUNT(*)` and `GROUP BY` to count the number of visits for each `patient_id`.
+
+```{sql connection=con}
+SELECT patient_id,
+  COUNT(*) AS count
+FROM visit
+GROUP BY patient_id
+```
+
+## **Exercise 6.3**
+
+Repeat the previous query and sort by the count in descending order.
+
+```{sql connection=con}
+SELECT patient_id,
+  COUNT(*) AS count
+FROM visit
+GROUP BY patient_id
+ORDER BY count DESC
+```
+
+## **Exercise 6.4**
+
+Repeat the previous query but use `HAVING` to only keep the groups with 40 or more.
+
+```{sql connection=con}
+SELECT patient_id,
+  COUNT(*) AS count
+FROM visit
+GROUP BY patient_id
+HAVING count > 39
+ORDER BY count DESC
+```
+
+# **Exercise 7**
+
+Write a query that calculates a number of summary statistics for `amount` in the payment table using `MAX`, `MIN`, `AVG` and `SUM`
+
+```{sql connection=con}
+SELECT 
+MAX(amount) as max_amount,
+MIN(amount) as min_amount,
+AVG(amount) as avg_amount,
+SUM(amount) as sum_amount
+FROM payment
+```
+
+## **Exercise 7.1**
+
+Modify the above query to do those calculations for each `patient_id`.
+
+```{sql connection=con}
+SELECT patient_id,
+MAX(amount) as max_amount,
+MIN(amount) as min_amount,
+AVG(amount) as avg_amount,
+SUM(amount) as sum_amount
+FROM payment
+GROUP BY patient_id
+```
+
+## **Exercise 7.2**
+
+Modify the above query to only keep the `patient_id`s that have more then 5 payments.
+
+```{sql connection=con}
+SELECT patient_id,
+MAX(amount) as max_amount,
+MIN(amount) as min_amount,
+AVG(amount) as avg_amount,
+SUM(amount) as sum_amount,
+COUNT(*) as count_payments
+FROM payment
+GROUP BY patient_id
+HAVING COUNT(*) > 5
+```
+
+# **Exercise 8.1**
+
+Create a SQL query to join the `doctor` and `visit` tables. Then, use SQL to compute the average visit length for each doctor. Hint: use the SQLite function `julianday` to convert a text date into a number.
+
+```{sql connection=con}
+SELECT d.doctor_id, d.first_name, d.last_name,
+AVG(julianday(visit_end_date) - julianday(visit_start_date)) as avg_visit
+FROM visit as v INNER JOIN doctor as d
+ON v.doctor_id = d.doctor_id
+GROUP BY d.doctor_id
+ORDER BY avg_visit desc
+```
+
+# **Exercise 8.2**
+
+What are the names of the doctors with the 5 longest and 5 shortest average visits? Hint: use the `LIMIT` command.
+
+```{sql connection=con}
+SELECT d.first_name, d.last_name,
+AVG(julianday(visit_end_date) - julianday(visit_start_date)) as avg_visit
+FROM visit as v INNER JOIN doctor as d
+ON v.doctor_id = d.doctor_id
+GROUP BY d.doctor_id
+ORDER BY avg_visit DESC LIMIT 5
+```
+
+```{sql connection=con}
+SELECT d.first_name, d.last_name,
+AVG(julianday(visit_end_date) - julianday(visit_start_date)) as avg_visit
+FROM visit as v INNER JOIN doctor as d
+ON v.doctor_id = d.doctor_id
+GROUP BY d.doctor_id
+ORDER BY avg_visit ASC LIMIT 5
+```
+
+# **Cleanup**
+
+Run the following chunk to disconnect from the connection.
+
+```{r}
+dbDisconnect(con)
+```
