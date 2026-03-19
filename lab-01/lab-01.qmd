@@ -1,0 +1,90 @@
+---
+title: "Lab 1"
+author: "Hanna Fei"
+format: html
+editor: visual
+embed-resources: true
+fig-width: 8
+fig-height: 8
+fig-align: center
+theme: sketchy
+---
+
+## Packages
+
+```{r, message = FALSE}
+library(datasauRus)
+library(tidyverse)
+```
+
+### Question 1
+
+```{r}
+?datasaurus_dozen
+table(datasaurus_dozen$dataset)
+```
+
+The datasaurus_dozen file has 1846 rows and 3 columns. It includes variables dataset, x, and y.
+
+### Question 2
+
+Plotting dino
+
+```{r}
+dino_data <- datasaurus_dozen[datasaurus_dozen$dataset == 'dino', ]
+ggplot(data = dino_data, mapping = aes(x = x, y = y)) +
+  geom_point()
+```
+
+Calculate correlation coefficient
+
+```{r}
+cor(dino_data$x, dino_data$y)
+```
+
+### Question 3
+
+```{r}
+star_data <- datasaurus_dozen[datasaurus_dozen$dataset == 'star', ]
+ggplot(data = star_data, mapping = aes(x = x, y = y)) +
+  geom_point()
+
+cor(star_data$x, star_data$y)
+```
+
+The correlation coefficient for the star dataset is -0.062, very similar to the dino dataset, though slightly less extreme.
+
+### Question 4
+
+```{r}
+circle_data <- datasaurus_dozen[datasaurus_dozen$dataset == 'circle', ]
+ggplot(data = circle_data, mapping = aes(x = x, y = y)) +
+  geom_point()
+
+cor(circle_data$x, circle_data$y)
+```
+
+The r for circle is -0.068, slightly more extreme than the r for dino.
+
+### Question 5
+
+```{r}
+#| fig-height: 10
+#| fig-width: 10
+par(mar = c(3,3,3,3))
+layout(matrix(1:16, nrow=4, ncol=4))
+for(name in unique(datasaurus_dozen$dataset)){
+  subset <- datasaurus_dozen[datasaurus_dozen$dataset == name, ]
+  plot(subset$x, subset$y, main = name)
+}
+layout(1)
+```
+
+### Question 6
+
+```{r}
+sapply(unique(datasaurus_dozen$dataset), function(name){
+    subset <- datasaurus_dozen[datasaurus_dozen$dataset == name, ]
+    return(cor(subset$x, subset$y))
+})
+```
