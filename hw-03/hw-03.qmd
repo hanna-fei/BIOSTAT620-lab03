@@ -1,0 +1,180 @@
+---
+title: "Homework 3"
+author: "Hanna Fei"
+format: html
+editor: visual
+embed-resources: true
+toc: true
+---
+
+## **Text Mining**
+
+```{r}
+#| include: false
+pubmed <- read.csv("~/Downloads/umich/BIOSTAT620/BIOSTAT620labs/data/pubmed.csv")
+
+library(tidytext)
+library(dplyr)
+library(ggplot2)
+library(forcats)
+library(textdata)
+
+options(tibble.print_max = Inf, tibble.width = Inf, paged.print = FALSE)
+```
+
+### Question 1
+
+1.  (15 points) How many abstracts are associated with each search term? Tokenize the abstracts and count the number of each token. Do you see anything interesting? What are the 5 most common tokens for each search term?
+
+```{r}
+# count number of abstracts in each search term
+pubmed %>% 
+  count(term)
+
+# tokenize abstracts
+tokens <- pubmed %>% 
+  unnest_tokens(token, abstract)
+
+# count number of each token
+pubmed_count <- tokens %>% 
+  count(token, sort = TRUE)
+
+head(pubmed_count, 15)
+```
+```{r}
+# 5 most common tokens for each term
+pubmed_terms <- tokens %>% 
+  group_by(term) %>% 
+  count(token) %>% 
+  top_n(5, n)
+
+pubmed_terms
+```
+Search terms 'covid', 'prostate cancer', and 'preeclampsia' have the most abstracts. When we look at the counts of each token, the top 15 include covid, 19, cancer, prostate, and patients among other stop words. This makes sense because there are more abstracts related to those terms. It is important to group by search term when analyzing the tokens because certain search terms are more representative in this data, which can affect sentiment analysis if the sentiments are different among different search terms.
+
+### Question 2
+
+2.  (15 points) Does removing stop words change what tokens appear as the most frequent? What are the 5 most common tokens for each search term after removing stop words?
+
+```{r}
+pubmed_stop <- tokens %>% 
+  # remove stop words
+  anti_join(stop_words, by = c("token" = "word")) %>%
+  # 5 most common tokens for each term
+  group_by(term) %>% 
+  count(token) %>% 
+  top_n(5,n)
+
+pubmed_stop
+```
+
+After removing stop words, the tokens that appear as most frequent are much more related to their corresponding search term.
+
+### Question 3
+
+3.  (15 points) Tokenize the abstracts into bigrams. Find the 10 most common bigrams and visualize them.
+
+```{r}
+# tokenize into bigrams
+bigrams <- pubmed %>% 
+  unnest_ngrams(ngram, abstract, n = 2)
+
+# visualize 10 most common bigrams
+top_bigrams <- bigrams %>% 
+  count(ngram, sort = TRUE) %>% 
+  top_n(10, n) %>% 
+  ggplot(aes(n, fct_reorder(ngram, n))) +
+  geom_col() +
+  labs(title = "Top 10 Bigrams", y = "bigrams", x = "frequency (n)") +
+  theme_minimal()
+  
+top_bigrams
+```
+Some of the top 10 bigrams include covid 19, prostate cancer, and pre eclampsia which are often used together as one phrase.
+
+### Question 4
+
+4.  (15 points) Calculate the TF-IDF value for each word-search term combination (here you want the search term to be the “document”). What are the 5 tokens from each search term with the highest TF-IDF value? How are the results different from the answers you got in Question 1?
+
+```{r}
+tf_idf <- pubmed %>% 
+  unnest_tokens(token, abstract) %>% 
+  count(term, token) %>% 
+  bind_tf_idf(token, term, n) %>% 
+  group_by(term) %>% 
+  top_n(5, tf_idf)
+
+tf_idf
+```
+
+These token results are even more specific to each search term compared to question 1 and 2, because the words with the highest tf-idf are words that are most common in each term but also are unique to those terms.
+
+## **Sentiment Analysis**
+
+### Question 5
+
+5.  (20 points) Perform a sentiment analysis using the NRC lexicon. What is the most common sentiment for each search term? What if you remove `"positive"` and `"negative"` from the list?
+
+```{r}
+#| warning: false
+sentiments <- pubmed %>% 
+  unnest_tokens(word, abstract) %>% 
+  inner_join(get_sentiments("nrc"))
+
+# top sentiment for each search term
+term_sentiments <- sentiments %>% 
+  group_by(term) %>% 
+  count(sentiment) %>% 
+  top_n(1, n)
+
+term_sentiments
+
+# removing "positive" and "negative"
+nrc_fun <- get_sentiments("nrc")
+nrc_fun <- nrc_fun[!nrc_fun$sentiment %in% c("positive", "negative"), ]
+
+term_sentiments_rm <- pubmed %>% 
+  unnest_tokens(word, abstract) %>% 
+  inner_join(nrc_fun) %>% 
+  group_by(term) %>% 
+  count(sentiment) %>% 
+  top_n(1, n)
+
+term_sentiments_rm
+```
+
+Using the NRC lexicon, the most common sentiment for each search term is either "positive" or "negative." After removing "positive" and "negative," the sentiments for each search term become more interesting, with sentiments including fear, disgust, and anticipation.
+
+### Question 6
+
+6.  (20 points) Now perform a sentiment analysis using the AFINN lexicon to get an average positivity score for each abstract (hint: you may want to create a variable that indexes, or counts, the abstracts). Create a visualization that shows these scores grouped by search term. Are any search terms noticeably different from the others?
+```{r}
+#| message: false
+# create variable to index abstracts
+pubmed <- pubmed %>% 
+  mutate(id = row_number())
+
+# get afinn scores
+score_abstracts <- pubmed %>% 
+  unnest_tokens(word, abstract) %>% 
+  inner_join(get_sentiments("afinn"))
+
+# average afinn score for each abstract
+avg_per_abstract <- score_abstracts %>% 
+  group_by(id) %>% 
+  summarize(sentiment = mean(value))
+
+head(avg_per_abstract)
+
+# visualize scores grouped by search term
+avg_by_term <- score_abstracts %>%  
+  group_by(id, term) %>% 
+  summarize(sentiment = mean(value)) %>% 
+  ungroup()
+
+ggplot(avg_by_term, aes(x = term, y = sentiment)) +
+  geom_boxplot() +
+  labs(title = "Distribution of Average Positivity Score per Abstract by Search Term") +
+  theme_minimal()
+```
+All search terms have a negative median of average sentiment per abstract except for cystic fibrosis, which has a very positive median in comparison to the others.
